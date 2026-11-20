@@ -8,3 +8,4 @@ application-*.yaml
 *.pem
 *.key
 secrets/
+.vscode/
