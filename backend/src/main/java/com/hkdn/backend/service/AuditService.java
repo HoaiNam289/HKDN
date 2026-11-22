@@ -1,0 +1,3 @@
+package com.hkdn.backend.service;
+import com.hkdn.backend.entity.AuditLog;import com.hkdn.backend.repository.*;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import java.util.UUID;
+@Service public class AuditService {private final AuditLogRepository logs;private final UserRepository users;public AuditService(AuditLogRepository logs,UserRepository users){this.logs=logs;this.users=users;}@Transactional public void record(UUID actor,String action,String type,String entityId,String details){AuditLog log=new AuditLog();if(actor!=null)log.setActor(users.findById(actor).orElse(null));log.setAction(action);log.setEntityType(type);log.setEntityId(entityId);log.setDetails(details);logs.save(log);}}

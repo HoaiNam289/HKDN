@@ -46,3 +46,15 @@
 .page-transition {
   animation: fadeIn 0.25s ease-out, slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.auth-story::after { content: ''; position: absolute; width: 420px; height: 420px; right: -180px; bottom: -160px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; box-shadow: 0 0 0 42px rgba(255,255,255,.05), 0 0 0 84px rgba(255,255,255,.035); }
+.auth-feature { display: grid; grid-template-columns: 24px 1fr auto; align-items: start; gap: 14px; padding: 16px 0; border-top: 1px solid rgba(255,255,255,.18); }
+.auth-feature svg { width: 20px; height: 20px; color: #d6a34d; margin-top: 2px; }
+.auth-feature strong, .auth-feature span { display: block; }
+.auth-feature strong { font-size: 14px; font-weight: 600; }
+.auth-feature span { margin-top: 4px; color: #cbd8f4; font-size: 12px; line-height: 1.5; }
+.auth-feature small { font-family: 'IBM Plex Mono', monospace; color: #91a8db; font-size: 11px; }
+.auth-kicker { display: inline-flex; align-items: center; gap: 8px; color: #1d4ed8; font-size: 12px; font-weight: 600; }
+.auth-kicker svg { width: 16px; height: 16px; }
+.auth-submit { background: #1d4ed8 !important; box-shadow: none !important; border-radius: 9px !important; }
+.auth-demo { border-top: 1px solid rgba(23,32,51,.12); padding-top: 18px; }

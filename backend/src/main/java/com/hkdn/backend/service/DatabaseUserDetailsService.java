@@ -24,7 +24,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findWithRolesByEmailIgnoreCase(email)
+        User user = userRepository.findWithRolesByEmailIgnoreCase(email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid email or password"));
 
         Collection<? extends GrantedAuthority> authorities = user.getRoles().stream()

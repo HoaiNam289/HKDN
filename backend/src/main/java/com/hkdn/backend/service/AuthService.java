@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.LinkedHashSet;
 
@@ -18,22 +19,39 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final UserManagementService userManagementService;
 
+    @Autowired
     public AuthService(
             AuthenticationManager authenticationManager,
             UserRepository userRepository,
-            JwtService jwtService) {
+            JwtService jwtService, UserManagementService userManagementService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
+        this.userManagementService = userManagementService;
+    }
+
+    public AuthService(AuthenticationManager authenticationManager, UserRepository userRepository, JwtService jwtService) {
+        this(authenticationManager, userRepository, jwtService, null);
+    }
+
+    public void changePassword(java.util.UUID id, com.hkdn.backend.dto.ChangePasswordRequest request) {
+        userManagementService.changePassword(id, request);
+    }
+
+    @Transactional
+    public UserResponse register(com.hkdn.backend.dto.RegisterRequest request) {
+        return userManagementService.register(request);
     }
 
     @Transactional(readOnly = true)
     public LoginResponse login(String email, String password) {
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
         authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(email, password));
+            new UsernamePasswordAuthenticationToken(normalizedEmail, password));
 
-        User user = userRepository.findWithRolesByEmailIgnoreCase(email)
+        User user = userRepository.findWithRolesByEmailIgnoreCase(normalizedEmail)
             .orElseThrow(() -> new IllegalStateException("Authenticated user no longer exists"));
 
         return new LoginResponse(

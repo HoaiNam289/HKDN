@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import BrandLogo from '../components/common/BrandLogo';
+import { useAuth } from '../auth/AuthContext';
 
 /**
  * Route name mapping for Vietnamese breadcrumbs
@@ -30,6 +31,7 @@ const STORAGE_KEY = 'hkdn_sidebar_collapsed';
 export const DashboardLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   // Load initial collapsed state from localStorage
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -89,8 +91,8 @@ export const DashboardLayout: React.FC = () => {
     return items;
   }, [location.pathname]);
 
-  // Handle logout (UI only, no token clearing per specifications)
   const handleLogout = () => {
+    logout();
     navigate('/login');
   };
 
@@ -193,10 +195,14 @@ export const DashboardLayout: React.FC = () => {
                 className="w-9 h-9 rounded-full bg-blue-600 text-white font-semibold text-sm flex items-center justify-center ring-2 ring-blue-100 shadow-xs select-none shrink-0"
                 title="Nguyễn Quản Trị"
               >
-                NQ
+                {(user?.fullName || 'User').split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
               </div>
 
               <div className="hidden sm:flex flex-col text-left">
+                <span className="text-sm font-semibold text-slate-900">{user?.fullName}</span>
+                <span className="text-[10px] text-slate-400">{user?.email}</span>
+              </div>
+              <div className="hidden">
                 <div className="flex items-center gap-1.5 leading-tight">
                   <span className="text-sm font-semibold text-slate-900">
                     Nguyễn Quản Trị
@@ -205,7 +211,7 @@ export const DashboardLayout: React.FC = () => {
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                     <User className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
-                    Admin
+                    {user?.roles[0]?.code}
                   </span>
                   <span className="text-[10px] text-slate-400">
                     Dữ liệu minh họa

@@ -43,18 +43,18 @@ const StatCard: React.FC<StatCardProps> = ({
   const currentVariant = colorMap[color] || colorMap.blue;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+    <div className="bg-white rounded-[14px] shadow-sm border border-slate-200 p-5 hover:-translate-y-0.5 transition-transform duration-200 flex flex-col justify-between min-h-[164px]">
       {/* Top row: Colored icon container on left, trend indicator on right */}
       <div className="flex items-center justify-between">
         <div
           className={`rounded-lg p-3 ${currentVariant.bg} ${currentVariant.text} flex items-center justify-center`}
         >
-          <Icon className="w-6 h-6 stroke-[2]" aria-hidden="true" />
+          <Icon className="w-5 h-5 stroke-[1.7]" aria-hidden="true" />
         </div>
 
         {trend && (
           <div
-            className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md ${
               trend.isPositive
                 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100'
                 : 'text-rose-700 bg-rose-50 border border-rose-100'
@@ -75,10 +75,10 @@ const StatCard: React.FC<StatCardProps> = ({
 
       {/* Content row: Value and Title */}
       <div className="mt-4">
-        <div className="text-3xl font-bold text-slate-900 tracking-tight">
+        <div className="text-[30px] leading-none font-medium text-slate-900 tracking-[-0.04em] tabular-nums">
           {value}
         </div>
-        <p className="text-sm text-slate-500 mt-1 font-medium">{title}</p>
+        <p className="text-xs text-slate-500 mt-2">{title}</p>
       </div>
     </div>
   );
