@@ -5,6 +5,9 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.hkdn.backend.entity.Certificate;
+import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSString;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -14,6 +17,9 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @Service
 public class CertificateDocumentService {
@@ -36,6 +42,18 @@ public class CertificateDocumentService {
                 stream.showText("Issuer: " + safe(certificate.getIssuerName()));
                 stream.endText();
             }
+            // Co dinh /ID theo ma chung chi: PDFBox mac dinh sinh /ID theo thoi gian hien tai,
+            // khien moi lan tao PDF ra mot ma bam khac nhau va xac thuc luon that bai.
+            UUID stableId = UUID.nameUUIDFromBytes(safe(certificate.getCode()).getBytes(StandardCharsets.UTF_8));
+            byte[] idBytes = ByteBuffer.allocate(16)
+                    .putLong(stableId.getMostSignificantBits())
+                    .putLong(stableId.getLeastSignificantBits())
+                    .array();
+            COSArray idArray = new COSArray();
+            idArray.add(new COSString(idBytes));
+            idArray.add(new COSString(idBytes));
+            document.getDocument().getTrailer().setItem(COSName.ID, idArray);
+
             document.save(out);
             return out.toByteArray();
         } catch (IOException exception) {
