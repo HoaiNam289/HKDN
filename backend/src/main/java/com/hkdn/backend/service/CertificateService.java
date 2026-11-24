@@ -128,4 +128,18 @@ public class CertificateService {
     public Certificate find(UUID id) {
         return certificates.findById(id).orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
     }
+
+    @Transactional(readOnly = true)
+    public Page<Certificate> myCertificates(String recipientEmail, Pageable pageable) {
+        if (recipientEmail == null || recipientEmail.isBlank()) {
+            return Page.empty(pageable);
+        }
+        return certificates.findByRecipientEmailIgnoreCase(recipientEmail.trim(), pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Certificate getByCode(String code) {
+        return certificates.findByCodeIgnoreCase(code.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
+    }
 }
