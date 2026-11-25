@@ -34,8 +34,7 @@ public class VerificationService {
     public VerificationResponse certificate(String code) {
         Optional<Certificate> found = certificates.findByCodeIgnoreCase(code);
         if (found.isEmpty()) {
-            return new VerificationResponse("NOT_FOUND", false, false, null, null, null, null, null, null,
-                    "Certificate was not found");
+            return VerificationResponse.withoutCertificate("NOT_FOUND", "Certificate was not found");
         }
         Certificate certificate = found.get();
         if (certificate.getStatus() == CertificateStatus.REVOKED) {
@@ -59,17 +58,14 @@ public class VerificationService {
     public VerificationResponse pdf(MultipartFile file) {
         try {
             if (file == null || file.isEmpty()) {
-                return new VerificationResponse("INVALID", false, false, null, null, null, null, null, null,
-                        "A PDF file is required");
+                return VerificationResponse.withoutCertificate("INVALID", "A PDF file is required");
             }
             String hash = hashes.sha256(file.getBytes());
             return certificates.findByContentHashIgnoreCase(hash)
                     .map(certificate -> certificate(certificate.getCode()))
-                    .orElse(new VerificationResponse("NOT_FOUND", false, false, null, null, null, null, null, null,
-                            "No certificate matches this document hash"));
+                    .orElse(VerificationResponse.withoutCertificate("NOT_FOUND", "No certificate matches this document hash"));
         } catch (Exception exception) {
-            return new VerificationResponse("INVALID", false, false, null, null, null, null, null, null,
-                    "Unable to verify document");
+            return VerificationResponse.withoutCertificate("INVALID", "Unable to verify document");
         }
     }
 
@@ -77,6 +73,7 @@ public class VerificationService {
                                           boolean hashValid, String message) {
         return new VerificationResponse(status, signatureValid, hashValid, certificate.getCode(),
                 certificate.getTitle(), certificate.getRecipientName(), certificate.getIssuerName(),
-                certificate.getIssuedAt(), certificate.getExpiresAt(), message);
+                certificate.getIssuedAt(), certificate.getExpiresAt(), message,
+                certificate.getContentHash(), certificate.getBlockchainTxHash());
     }
 }
