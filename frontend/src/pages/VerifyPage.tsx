@@ -11,7 +11,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  LogIn,
   FileText,
   Sparkles,
   Calendar,
@@ -25,7 +24,7 @@ import {
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import StatusBadge from '../components/common/StatusBadge';
-import BrandLogo from '../components/common/BrandLogo';
+import PortalHeader from '../components/common/PortalHeader';
 
 type VerifyTab = 'code' | 'qr' | 'pdf';
 
@@ -179,28 +178,7 @@ export const VerifyPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 flex flex-col justify-between font-sans text-slate-900">
       {/* 1. CUSTOM HEADER */}
-      <header className="w-full bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          {/* Logo & System Brand */}
-          <div className="flex items-center gap-3">
-            <BrandLogo />
-            <span className="hidden sm:inline-block text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-              Cổng tra cứu công khai
-            </span>
-          </div>
-
-          {/* Link to login */}
-          <div className="flex items-center gap-3">
-            <a
-              href="/login"
-              className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors px-3.5 py-2 rounded-lg hover:bg-slate-100"
-            >
-              <LogIn className="w-4 h-4 text-slate-500" />
-              <span>Đăng nhập hệ thống</span>
-            </a>
-          </div>
-        </div>
-      </header>
+      <PortalHeader />
 
       {/* 2. MAIN CONTENT AREA */}
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
@@ -209,6 +187,7 @@ export const VerifyPage: React.FC = () => {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 shadow-xs mb-1">
             <ShieldCheck className="w-7 h-7 stroke-[2]" />
           </div>
+          <p className="text-xs font-semibold text-blue-700">Cổng tra cứu công khai</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Xác thực Chứng chỉ
           </h1>

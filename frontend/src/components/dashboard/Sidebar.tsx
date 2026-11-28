@@ -1,15 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Award,
-  BookOpen,
-  Users,
-  ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { adminMenu } from '../../navigation';
 import BrandLogo from '../common/BrandLogo';
 
 export interface SidebarProps {
@@ -19,42 +11,6 @@ export interface SidebarProps {
   onMobileClose: () => void;
 }
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-}
-
-const navItems: NavItem[] = [
-  {
-    name: 'Tổng quan',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    exact: true,
-  },
-  {
-    name: 'Chứng chỉ',
-    href: '/dashboard/certificates',
-    icon: Award,
-  },
-  {
-    name: 'Học liệu',
-    href: '/dashboard/materials',
-    icon: BookOpen,
-  },
-  {
-    name: 'Người dùng',
-    href: '/dashboard/users',
-    icon: Users,
-  },
-  {
-    name: 'Xác thực',
-    href: '/verify',
-    icon: ShieldCheck,
-  },
-];
-
 const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggle,
@@ -63,11 +19,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const location = useLocation();
 
-  // Close mobile sidebar automatically on route changes
+  const previousPath = useRef(location.pathname);
   useEffect(() => {
-    if (isMobileOpen) {
-      onMobileClose();
-    }
+    const navigated = previousPath.current !== location.pathname;
+    previousPath.current = location.pathname;
+    if (navigated && isMobileOpen) onMobileClose();
   }, [location.pathname, isMobileOpen, onMobileClose]);
 
   return (
@@ -126,24 +82,23 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Navigation Items */}
           <nav className="mt-4 space-y-1.5" aria-label="Menu chính">
-            {navItems.map((item) => {
+            {adminMenu.map((item) => {
               const Icon = item.icon;
-              const isItemActive = item.exact
-                ? location.pathname === item.href
-                : location.pathname.startsWith(item.href);
 
               return (
                 <div key={item.href} className="relative group">
                   <NavLink
                     to={item.href}
                     end={item.exact}
+                    aria-label={item.name}
+                    onClick={isMobileOpen ? onMobileClose : undefined}
                     className={({ isActive }) =>
                       `flex items-center gap-3 py-2.5 rounded-lg text-sm transition-all duration-150 ${
                         isCollapsed && !isMobileOpen
                           ? 'justify-center mx-2 px-0'
                           : 'px-3 mx-3'
                       } ${
-                        isActive || isItemActive
+                        isActive
                           ? 'bg-blue-50 text-blue-700 font-medium'
                           : 'text-slate-600 hover:bg-slate-50'
                       }`
