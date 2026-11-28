@@ -40,6 +40,56 @@ const formatFileSize = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
+import { Loader2, AlertTriangle, XCircle, Clock } from 'lucide-react';
+import {
+  verifyByCode,
+  verifyByPdf,
+  type VerificationResult,
+  type VerificationStatus,
+} from '../services/verification';
+
+type BadgeStatus = 'success' | 'warning' | 'danger' | 'info' | 'default';
+
+/** Nhan hien thi cho tung ket qua xac thuc. */
+const STATUS_VIEW: Record<VerificationStatus, { label: string; badge: BadgeStatus; detail: string }> = {
+  VALID: {
+    label: 'Chứng chỉ hợp lệ',
+    badge: 'success',
+    detail: 'Chữ ký số và mã băm tài liệu đều khớp. Chứng chỉ do hệ thống cấp và chưa bị chỉnh sửa.',
+  },
+  UNVERIFIED: {
+    label: 'Không xác thực được',
+    badge: 'danger',
+    detail: 'Chữ ký số hoặc mã băm không khớp. Tài liệu có thể đã bị chỉnh sửa sau khi phát hành.',
+  },
+  REVOKED: {
+    label: 'Đã bị thu hồi',
+    badge: 'danger',
+    detail: 'Chứng chỉ này đã bị đơn vị cấp thu hồi và không còn giá trị.',
+  },
+  PENDING: {
+    label: 'Chưa phát hành',
+    badge: 'warning',
+    detail: 'Chứng chỉ đã được tạo nhưng chưa hoàn tất phát hành.',
+  },
+  NOT_FOUND: {
+    label: 'Không tìm thấy',
+    badge: 'default',
+    detail: 'Không có chứng chỉ nào khớp với mã hoặc tài liệu bạn cung cấp.',
+  },
+  INVALID: {
+    label: 'Dữ liệu không hợp lệ',
+    badge: 'danger',
+    detail: 'Không đọc được tài liệu. Vui lòng kiểm tra lại file PDF.',
+  },
+};
+
+/** Hien thi ngay gio theo gio Viet Nam. */
+const formatDateTime = (value: string | null): string => {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+};
+
 export const VerifyPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<VerifyTab>('code');
   const [certCodeInput, setCertCodeInput] = useState('');
@@ -49,10 +99,36 @@ export const VerifyPage: React.FC = () => {
   const [selectedPdf, setSelectedPdf] = useState<File | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Demo result state (Strictly controlled, initially false)
-  const [showDemoResult, setShowDemoResult] = useState<boolean>(false);
+  // Ket qua xac thuc that tu backend
+  const [result, setResult] = useState<VerificationResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [requestError, setRequestError] = useState('');
+  const [showTechnical, setShowTechnical] = useState(false);
   const [copiedTx, setCopiedTx] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  const runVerification = async (request: () => Promise<VerificationResult>) => {
+    setLoading(true);
+    setRequestError('');
+    setResult(null);
+    setShowTechnical(false);
+    try {
+      setResult(await request());
+    } catch {
+      setRequestError('Không kết nối được máy chủ xác thực. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mo trang voi /verify?code=... (lien ket chia se, ma QR) thi tu dong xac thuc
+  React.useEffect(() => {
+    const codeFromUrl = new URLSearchParams(window.location.search).get('code');
+    if (codeFromUrl && codeFromUrl.trim()) {
+      setCertCodeInput(codeFromUrl);
+      void runVerification(() => verifyByCode(codeFromUrl));
+    }
+  }, []);
 
   // Handle Verify by Code
   const handleVerifyByCode = (e: React.FormEvent) => {
@@ -62,15 +138,21 @@ export const VerifyPage: React.FC = () => {
       return;
     }
     setCodeError('');
-    setShowDemoResult(true);
+    void runVerification(() => verifyByCode(certCodeInput));
   };
 
   // Handle Verify by PDF
   const handleVerifyByPdf = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPdf) return;
-    setShowDemoResult(true);
+    void runVerification(() => verifyByPdf(selectedPdf));
   };
+
+  const view = result ? STATUS_VIEW[result.status] ?? STATUS_VIEW.INVALID : null;
+  const hasCertificate = Boolean(result?.code);
+  const shareLink = result?.code
+    ? `${window.location.origin}/verify?code=${encodeURIComponent(result.code)}`
+    : '';
 
   // Copy helpers
   const handleCopy = (text: string, type: 'tx' | 'code') => {
@@ -334,32 +416,45 @@ export const VerifyPage: React.FC = () => {
         </div>
 
         {/* 3. RESULT AREA */}
-        <section className="space-y-4" aria-label="Khu vực kết quả xác thực">
-          {/* Toggle Minh Họa Link/Button */}
+        <section className="space-y-4" aria-label="Khu vực kết quả xác thực" aria-live="polite">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
               Kết quả xác thực
             </h2>
-            <button
-              type="button"
-              onClick={() => setShowDemoResult((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors p-1 rounded cursor-pointer"
-            >
-              {showDemoResult ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5" />
-                  <span>(Ẩn minh họa)</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>(Xem minh họa)</span>
-                </>
-              )}
-            </button>
+            {result && hasCertificate && (
+              <button
+                type="button"
+                onClick={() => setShowTechnical((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors p-1 rounded cursor-pointer"
+              >
+                {showTechnical ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5" />
+                    <span>Ẩn chi tiết kỹ thuật</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Xem chi tiết kỹ thuật</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
-          {!showDemoResult ? (
+          {loading ? (
+            /* Dang xac thuc */
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-8 sm:p-12 text-center shadow-xs flex flex-col items-center justify-center gap-3">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <p className="text-sm font-medium text-slate-600">Đang kiểm tra chữ ký số và mã băm tài liệu...</p>
+            </div>
+          ) : requestError ? (
+            /* Loi ket noi */
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800 flex items-start gap-3 shadow-xs">
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium">{requestError}</p>
+            </div>
+          ) : !result || !view ? (
             /* Empty State */
             <div className="bg-white rounded-2xl border border-slate-200/90 p-8 sm:p-12 text-center shadow-xs flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
@@ -368,268 +463,212 @@ export const VerifyPage: React.FC = () => {
               <p className="text-sm font-medium text-slate-600">
                 Nhập mã chứng chỉ hoặc upload tài liệu để bắt đầu xác thực
               </p>
-              <button
-                type="button"
-                onClick={() => setShowDemoResult(true)}
-                className="mt-1 text-xs text-blue-600 hover:underline font-medium cursor-pointer inline-flex items-center gap-1"
-              >
+              <p className="text-xs text-slate-500 inline-flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
-                (Xem minh họa kết quả xác thực hợp lệ)
-              </button>
+                Kết quả được kiểm tra bằng chữ ký số RSA-2048 và mã băm SHA-256
+              </p>
             </div>
           ) : (
-            /* Demo Result Display */
             <div className="space-y-4 animate-in fade-in duration-300">
-              {/* Mandatory Illustrative Disclaimer Alert */}
-              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 flex items-center justify-between gap-3 shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <Sparkles className="w-5 h-5 text-amber-600 shrink-0" />
-                  <p className="text-xs sm:text-sm font-semibold">
-                    Kết quả minh họa — Không phải dữ liệu xác thực thực tế
-                  </p>
+              {/* Tong ket */}
+              <div
+                className={`rounded-2xl border p-5 flex items-start justify-between gap-3 shadow-xs ${
+                  result.status === 'VALID'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                    : view.badge === 'danger'
+                      ? 'border-red-200 bg-red-50 text-red-900'
+                      : 'border-amber-200 bg-amber-50 text-amber-900'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {result.status === 'VALID' ? (
+                    <CheckCircle2 className="w-6 h-6 shrink-0 text-emerald-600" />
+                  ) : view.badge === 'danger' ? (
+                    <XCircle className="w-6 h-6 shrink-0 text-red-600" />
+                  ) : (
+                    <AlertTriangle className="w-6 h-6 shrink-0 text-amber-600" />
+                  )}
+                  <div>
+                    <p className="font-bold">{view.label}</p>
+                    <p className="text-sm mt-0.5">{view.detail}</p>
+                  </div>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowDemoResult(false)}
-                  className="p-1 rounded text-amber-700 hover:bg-amber-100 transition-colors"
-                  aria-label="Đóng minh họa"
+                  onClick={() => setResult(null)}
+                  className="p-1 rounded hover:bg-black/5 transition-colors"
+                  aria-label="Đóng kết quả"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* 1. Certificate Info Card */}
-              <div className="bg-white rounded-2xl border border-blue-200 shadow-md p-6 sm:p-8 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
-                      <Award className="w-5 h-5 stroke-[2]" />
+              {hasCertificate && (
+                <>
+                  {/* 1. Thong tin chung chi */}
+                  <div className="bg-white rounded-2xl border border-blue-200 shadow-md p-6 sm:p-8 space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                          <Award className="w-5 h-5 stroke-[2]" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-900">Thông tin Chứng chỉ</h3>
+                      </div>
+                      <StatusBadge status={view.badge} dot>
+                        {view.label}
+                      </StatusBadge>
                     </div>
+
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">
-                        Thông tin Chứng chỉ
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Hệ thống cấp phát chứng chỉ số chuẩn quốc gia EduCertify
-                      </p>
-                    </div>
-                  </div>
-
-                  <StatusBadge status="success" dot>
-                    Chứng chỉ Hợp lệ
-                  </StatusBadge>
-                </div>
-
-                {/* Main Certificate Title */}
-                <div>
-                  <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
-                    Tên chứng chỉ
-                  </span>
-                  <h4 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 leading-snug">
-                    Chứng chỉ Công nghệ Thông tin Chuẩn Kỹ năng Sử dụng CNTT Nâng cao
-                  </h4>
-                  <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                    Chứng nhận hoàn thành xuất sắc chương trình chuẩn kỹ năng sử dụng công nghệ thông tin nâng cao theo quy định của Bộ Giáo dục & Đào tạo.
-                  </p>
-                </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                      <Hash className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Mã chứng chỉ</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-bold text-slate-900">
-                        CERT-2024-001
+                      <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                        Tên chứng chỉ
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy('CERT-2024-001', 'code')}
-                        className="text-slate-400 hover:text-blue-600 transition-colors p-1"
-                        title="Sao chép mã"
-                      >
-                        {copiedCode ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                      <User className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Người nhận</span>
-                    </div>
-                    <p className="font-bold text-slate-900 text-sm">
-                      Nguyễn Văn An
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      nguyen.van.an@educertify.edu.vn
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                      <Building className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Đơn vị cấp phát</span>
-                    </div>
-                    <p className="font-bold text-slate-900 text-sm">
-                      Trường Đại học Bách Khoa EduCertify
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Thời hạn hiệu lực</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      15/01/2024 – 15/01/2029
-                    </p>
-                    <p className="text-[11px] text-emerald-700 font-medium">
-                      Còn hạn sử dụng
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Signature Status Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-7 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
-                      <Lock className="w-5 h-5 stroke-[2]" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-slate-900">
-                        Trạng thái Chữ ký số
+                      <h4 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 leading-snug">
+                        {result.title}
                       </h4>
-                      <p className="text-xs text-slate-500">
-                        Chữ ký số điện tử theo tiêu chuẩn PKI
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                          <Hash className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Mã chứng chỉ</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-bold text-slate-900">{result.code}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(result.code ?? '', 'code')}
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1"
+                            title="Sao chép mã"
+                          >
+                            {copiedCode ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <a
+                            href={shareLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-slate-400 hover:text-blue-600 transition-colors p-1"
+                            title="Mở liên kết xác thực của chứng chỉ này"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Người nhận</span>
+                        </div>
+                        <p className="font-bold text-slate-900 text-sm">{result.recipientName}</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                          <Building className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Đơn vị cấp phát</span>
+                        </div>
+                        <p className="font-bold text-slate-900 text-sm">{result.issuerName}</p>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Thời hạn hiệu lực</span>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {formatDateTime(result.issuedAt)} – {result.expiresAt ? formatDateTime(result.expiresAt) : 'Không thời hạn'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Trang thai chu ky so */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-7 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center">
+                          <Lock className="w-5 h-5 stroke-[2]" />
+                        </div>
+                        <h4 className="text-base font-bold text-slate-900">Trạng thái Chữ ký số</h4>
+                      </div>
+                      <StatusBadge status={result.signatureValid ? 'success' : 'danger'} dot>
+                        {result.signatureValid ? 'Chữ ký hợp lệ' : 'Chữ ký không hợp lệ'}
+                      </StatusBadge>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs sm:text-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
+                        <span className="text-slate-500">Mã băm tài liệu (SHA-256):</span>
+                        <StatusBadge status={result.hashValid ? 'success' : 'danger'}>
+                          {result.hashValid ? 'Khớp với bản gốc' : 'Không khớp'}
+                        </StatusBadge>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
+                        <span className="text-slate-500">Thuật toán:</span>
+                        <span className="font-semibold text-slate-800">RSA-2048 / SHA-256</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 gap-1">
+                        <span className="text-slate-500 inline-flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> Thời điểm phát hành:
+                        </span>
+                        <span className="font-medium text-slate-800 font-mono text-xs">
+                          {formatDateTime(result.issuedAt)}
+                        </span>
+                      </div>
+                      {showTechnical && result.contentHash && (
+                        <div className="flex flex-col gap-1 pt-2">
+                          <span className="text-slate-500">Mã băm lưu khi phát hành:</span>
+                          <span className="font-mono text-[11px] text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200 break-all">
+                            {result.contentHash}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. Trang thai Blockchain */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-7 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+                          <LinkIcon className="w-5 h-5 stroke-[2]" />
+                        </div>
+                        <h4 className="text-base font-bold text-slate-900">Trạng thái Blockchain</h4>
+                      </div>
+                      <StatusBadge status={result.blockchainTxHash ? 'info' : 'default'} dot>
+                        {result.blockchainTxHash ? 'Đã ghi nhận on-chain' : 'Chưa có dữ liệu'}
+                      </StatusBadge>
+                    </div>
+                    {result.blockchainTxHash ? (
+                      <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 font-mono text-xs text-slate-800">
+                        <span className="truncate">{result.blockchainTxHash}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(result.blockchainTxHash ?? '', 'tx')}
+                          className="text-slate-400 hover:text-blue-600 transition-colors p-0.5"
+                          title="Sao chép TxHash"
+                        >
+                          {copiedTx ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs sm:text-sm text-slate-500">
+                        Chứng chỉ chưa được ghi lên Blockchain.
                       </p>
-                    </div>
+                    )}
                   </div>
-
-                  <StatusBadge status="success" dot>
-                    Đã ký hợp lệ
-                  </StatusBadge>
-                </div>
-
-                <div className="space-y-2.5 text-xs sm:text-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Tổ chức ký số:</span>
-                    <span className="font-semibold text-slate-900">
-                      Ban Giám hiệu Trường Đại học Bách Khoa EduCertify
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Thời điểm ký (Timestamp):</span>
-                    <span className="font-medium text-slate-800 font-mono text-xs">
-                      15/01/2024 09:30:15 (GMT+7)
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Thuật toán mã hóa:</span>
-                    <span className="font-semibold text-slate-800">
-                      RSA-2048 / SHA-256
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 gap-1">
-                    <span className="text-slate-500">Chứng thư thẩm quyền:</span>
-                    <span className="text-slate-700 font-medium">
-                      EduCertify Root CA (Hệ thống Khóa Công khai Quốc gia)
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Blockchain Status Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-md p-6 sm:p-7 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
-                      <LinkIcon className="w-5 h-5 stroke-[2]" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-bold text-slate-900">
-                        Trạng thái Blockchain
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        Bằng chứng bất biến trên mạng lưới phi tập trung
-                      </p>
-                    </div>
-                  </div>
-
-                  <StatusBadge status="info" dot>
-                    Đã ghi nhận on-chain
-                  </StatusBadge>
-                </div>
-
-                <div className="space-y-3 text-xs sm:text-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Mạng lưới Blockchain:</span>
-                    <span className="font-semibold text-slate-900">
-                      Ethereum (Sepolia Testnet)
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Mã băm giao dịch (TxHash):</span>
-                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 font-mono text-xs text-slate-800">
-                      <span className="truncate max-w-[200px] sm:max-w-xs">
-                        0x9f83a4c5e6d78219b0c1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopy(
-                            '0x9f83a4c5e6d78219b0c1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3',
-                            'tx'
-                          )
-                        }
-                        className="text-slate-400 hover:text-blue-600 transition-colors p-0.5"
-                        title="Sao chép TxHash"
-                      >
-                        {copiedTx ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <a
-                        href="https://sepolia.etherscan.io"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 transition-colors p-0.5"
-                        title="Xem trên Etherscan"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 border-b border-slate-50 gap-1">
-                    <span className="text-slate-500">Số khối xác nhận (Block):</span>
-                    <span className="font-mono text-xs font-semibold text-slate-800">
-                      #5,892,143 (14,290 xác nhận)
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between py-1.5 gap-1">
-                    <span className="text-slate-500">Mã băm dữ liệu gốc (SHA-256):</span>
-                    <span className="font-mono text-[11px] text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 truncate max-w-[260px] sm:max-w-sm">
-                      8f4e2c91b5a37d04e6c891f274a980b1352de840c6a512739fb014e7dc284915
-                    </span>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           )}
         </section>
